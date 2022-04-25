@@ -86,7 +86,7 @@ def get_classes():
 
 def get_full_paths():
     _full_paths = []
-    base_dir = "/home/tom/Desktop/images/water/canoe"
+    base_dir = "/home/tom/Desktop/images/water/no_canoe/actual"
     for _file in os.listdir(base_dir):
         img_url = f'{base_dir}/{_file}'
         _full_paths.append(img_url)
@@ -109,7 +109,7 @@ def run_model(image, classes, classifier):
     for i, item in enumerate(top_results):
         class_index = item if includes_background_class else item + 1
         line = f'({i + 1}) {class_index:4} - {classes[class_index]}: {probabilities[0][top_results][i]}'
-        # print(line)
+        print(line)
         results[classes[class_index]] = probabilities[0][top_results][i]
     return results
 
