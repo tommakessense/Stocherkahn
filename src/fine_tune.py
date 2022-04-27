@@ -2,9 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import tensorflow as tf
+from tensorflow.python.ops.gen_dataset_ops import BatchDataset
 
 datadir = '/home/tom/Desktop/images/water'
-BATCH_SIZE = 32
+BATCH_SIZE = 8
 IMG_SIZE = (150, 200)
 k = 4
 num_epochs = 100
@@ -27,17 +28,22 @@ def get_data_augmentation():
     ])
     return data_augmentation
 
-def show_altered_image(data_augmentation, train_dataset):
-    for image, _ in train_dataset.take(5):
-        plt.figure(figsize=(10, 10))
-        first_image = image[0]
-        for i in range(6):
-            plt.subplot(3, 3, i + 1)
-            augmented_image = data_augmentation(tf.expand_dims(first_image, 0))
-            plt.imshow(augmented_image[0] / 255)
-            plt.axis('off')
-
-        plt.show()
+def create_additional_datasets(data_augmentation, train_datasets, size=8):
+    augmented_images = []
+    for image_batch, label in train_datasets.take(1):
+        for image in image_batch:
+            for i in range(size):
+                augmented_image = data_augmentation(image)
+                augmented_images.append((augmented_image, label))
+    batch = []
+    dataset = []
+    for image, label in augmented_images:
+        if len(batch) == BATCH_SIZE:
+            dataset.append(batch)
+            batch = []
+        batch.append((image, label))
+    dataset.append(batch)
+    return dataset
 
 
 def get_kfolded_datasets(train_data: list, train_targets: list, num_val_samples: int, i: int):
@@ -71,18 +77,19 @@ if __name__ == '__main__':
     class_names = train_datasets.class_names
 
     # add more training data
-    # data_augmentation = get_data_augmentation()
-
+    data_augmentation = get_data_augmentation()
+    additional_datasets = create_additional_datasets(data_augmentation, train_datasets)
+    train_datasets.append(additional_datasets)
     AUTOTUNE = tf.data.AUTOTUNE
     train_dataset = train_datasets.prefetch(buffer_size=AUTOTUNE)
-
-    preprocess_input = tf.keras.applications.mobilenet_v3.preprocess_input
-    IMG_SHAPE = IMG_SIZE + (3,)
-    base_model = tf.keras.applications.MobileNetV3Large(input_shape=IMG_SHAPE,
-                                                        include_top=False,
-                                                        weights='imagenet')
-    base_model.trainable = False
-    base_model.summary()
+    #
+    # preprocess_input = tf.keras.applications.mobilenet_v3.preprocess_input
+    # IMG_SHAPE = IMG_SIZE + (3,)
+    # base_model = tf.keras.applications.MobileNetV3Large(input_shape=IMG_SHAPE,
+    #                                                     include_top=False,
+    #                                                     weights='imagenet')
+    # base_model.trainable = False
+    # base_model.summary()
     # train_data, train_targets = convert_train_datasets(train_datasets)
     # num_val_samples = len(train_datasets) // k
     #
