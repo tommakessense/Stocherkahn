@@ -92,26 +92,36 @@ def convert_train_datasets(train_datasets):
 
 if __name__ == '__main__':
     train_datasets = tf.keras.utils.image_dataset_from_directory(datadir,
-                                                                shuffle=True,
+                                                                shuffle=False,
                                                                 batch_size=None,
+                                                                 validation_split=0.25,
+                                                                 subset='training',
                                                                 image_size=IMG_SIZE)
+    val_datasets = tf.keras.utils.image_dataset_from_directory(datadir,
+                                                                 shuffle=False,
+                                                                 batch_size=None,
+                                                                 validation_split=0.25,
+                                                                 subset='validation',
+                                                                 image_size=IMG_SIZE)
     class_names = train_datasets.class_names
 
     # add more training data
     data_augmentation = get_data_augmentation()
-    additional_datasets = create_additional_datasets(data_augmentation, train_datasets)
+    additional_datasets = create_additional_datasets(data_augmentation, train_datasets, 16)
     train_datasets = train_datasets.concatenate(additional_datasets)
     AUTOTUNE = tf.data.AUTOTUNE
-    train_dataset = train_datasets.prefetch(buffer_size=AUTOTUNE)
-    train_dataset = train_dataset.batch(BATCH_SIZE)
-    train_data, train_targets = convert_train_datasets(train_datasets)
+    train_datasets = train_datasets.prefetch(buffer_size=AUTOTUNE)
+    val_datasets = val_datasets.prefetch(buffer_size=AUTOTUNE)
+    train_datasets = train_datasets.batch(BATCH_SIZE)
+    val_datasets = val_datasets.batch(BATCH_SIZE)
+    #train_data, train_targets = convert_train_datasets(train_datasets)
 
     preprocess_input = tf.keras.applications.mobilenet_v3.preprocess_input
     IMG_SHAPE = IMG_SIZE + (3,)
     base_model = tf.keras.applications.MobileNetV3Large(input_shape=IMG_SHAPE,
                                                         include_top=False,
                                                         weights='imagenet')
-    image_batch, label_batch = next(iter(train_dataset))
+    image_batch, label_batch = next(iter(train_datasets))
     feature_batch = base_model(image_batch)
     base_model.trainable = False
     # base_model.summary()
@@ -120,7 +130,6 @@ if __name__ == '__main__':
     prediction_layer = tf.keras.layers.Dense(1)
 
     inputs = tf.keras.Input(shape=IMG_SHAPE)
-    # x = data_augmentation(inputs)
     x = tf.keras.applications.mobilenet_v3.preprocess_input(inputs)
     x = base_model(x, training=False)
     x = global_average_layer(x)
@@ -132,13 +141,13 @@ if __name__ == '__main__':
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
               loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
               metrics=['accuracy'])
-    initial_epochs = 10
-    split = len(train_dataset) // 4
-    validation_split = train_dataset.range(0, split)
-    train_split = train_dataset.range(split, len(train_dataset) - 1)
-    history = model.fit(train_split,
+    initial_epochs = 15
+    # split = len(train_dataset) // 4
+    # validation_split = train_dataset.range(0, split)
+    # train_split = train_dataset.range(split, len(train_dataset) - 1)
+    history = model.fit(train_datasets,
                         epochs=initial_epochs,
-                        validation_data=validation_split)
+                        validation_data=val_datasets)
 
     # num_val_samples = len(train_datasets) // k
     # all_mae_histories = []
