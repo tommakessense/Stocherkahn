@@ -103,18 +103,22 @@ if __name__ == '__main__':
                                                                  validation_split=0.25,
                                                                  subset='validation',
                                                                  image_size=IMG_SIZE)
+    val_batches = tf.data.experimental.cardinality(val_datasets)
+    test_datasets = val_datasets.take(val_batches // 5)
+    val_datasets = val_datasets.skip(val_batches // 5)
+
     class_names = train_datasets.class_names
 
     # add more training data
-    data_augmentation = get_data_augmentation()
-    additional_datasets = create_additional_datasets(data_augmentation, train_datasets, 16)
-    train_datasets = train_datasets.concatenate(additional_datasets)
+    # data_augmentation = get_data_augmentation()
+    # additional_datasets = create_additional_datasets(data_augmentation, train_datasets, 16)
+    # train_datasets = train_datasets.concatenate(additional_datasets)
     AUTOTUNE = tf.data.AUTOTUNE
     train_datasets = train_datasets.prefetch(buffer_size=AUTOTUNE)
     val_datasets = val_datasets.prefetch(buffer_size=AUTOTUNE)
     train_datasets = train_datasets.batch(BATCH_SIZE)
     val_datasets = val_datasets.batch(BATCH_SIZE)
-    #train_data, train_targets = convert_train_datasets(train_datasets)
+    # train_data, train_targets = convert_train_datasets(train_datasets)
 
     preprocess_input = tf.keras.applications.mobilenet_v3.preprocess_input
     IMG_SHAPE = IMG_SIZE + (3,)
@@ -141,24 +145,25 @@ if __name__ == '__main__':
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
               loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
               metrics=['accuracy'])
-    initial_epochs = 15
-    # split = len(train_dataset) // 4
-    # validation_split = train_dataset.range(0, split)
-    # train_split = train_dataset.range(split, len(train_dataset) - 1)
+    initial_epochs = 1
     history = model.fit(train_datasets,
                         epochs=initial_epochs,
                         validation_data=val_datasets)
 
-    # num_val_samples = len(train_datasets) // k
-    # all_mae_histories = []
-    # for i in range(k):
-    # print(f"Processing fold #{i}")
-    # val_data, val_targets, partial_train_data, partial_train_targets = get_kfolded_datasets(train_data, train_targets, num_val_samples, i, BATCH_SIZE)
-    # model = build_model_kfold(base_model, IMG_SHAPE, data_augmentation)
-    # history = model.fit(partial_train_data, partial_train_targets,
-    #                 validation_data=(val_data, val_targets),
-    #                 epochs=num_epochs, batch_size=BATCH_SIZE, verbose=0)
-    # accuracy_history = history.history["val_accuracy"]
-    # all_mae_histories.append(accuracy_history)
-        # model compile
+    # Retrieve a batch of images from the test set
+    test_image_batch, test_label_batch = next(iter(test_datasets))
+    predictions = model.predict(tf.data.Dataset.from_tensors(test_image_batch).batch(BATCH_SIZE), batch_size=BATCH_SIZE).flatten()
 
+    # Apply a sigmoid since our model returns logits
+    predictions = tf.nn.sigmoid(predictions)
+    predictions = tf.where(predictions < 0.5, 0, 1)
+
+    print('Predictions:\n', predictions.numpy())
+    print('Labels:\n', test_label_batch)
+
+    plt.figure(figsize=(10, 10))
+    for i in range(9):
+        ax = plt.subplot(3, 3, i + 1)
+        plt.imshow(test_image_batch[i].astype("uint8"))
+        plt.title(class_names[predictions[i]])
+        plt.axis("off")
