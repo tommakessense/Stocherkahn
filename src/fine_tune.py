@@ -1,19 +1,24 @@
+from os import path
 from time import time
 import argparse
+
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("datadir")
+parser.add_argument("--epochs", type=int, default=15)
 args = parser.parse_args()
 
-datadir = args.datadir
+train_dir = path.join(args.datadir, 'labeled')
+test_dir = path.join(args.datadir, 'tests')
+
 BATCH_SIZE = 8
 IMG_SIZE = (150, 200)
 k = 4
-num_epochs = 100
+initial_epochs = args.epochs
+
 
 def show_image_and_label(train_dataset):
     plt.figure(figsize=(10, 10))
@@ -95,7 +100,7 @@ def convert_train_datasets(train_datasets):
 
 if __name__ == '__main__':
     tf.random.set_seed(round(time()))
-    train_datasets = tf.keras.utils.image_dataset_from_directory(datadir,
+    train_datasets = tf.keras.utils.image_dataset_from_directory(train_dir,
                                                                 shuffle=True,
                                                                 batch_size=None,
                                                                  label_mode='binary',
@@ -103,17 +108,20 @@ if __name__ == '__main__':
                                                                  seed=2,
                                                                  subset='training',
                                                                 image_size=IMG_SIZE)
-    val_datasets = tf.keras.utils.image_dataset_from_directory(datadir,
-                                                                 shuffle=False,
+    val_datasets = tf.keras.utils.image_dataset_from_directory(train_dir,
+                                                                 shuffle=True,
                                                                  batch_size=None,
                                                                  label_mode='binary',
                                                                  validation_split=0.25,
                                                                seed=2,
                                                                  subset='validation',
                                                                  image_size=IMG_SIZE)
-    val_batches = tf.data.experimental.cardinality(val_datasets)
-    test_datasets = val_datasets.take(val_batches // 5)
-    val_datasets = val_datasets.skip(val_batches // 5)
+
+    test_datasets = tf.keras.utils.image_dataset_from_directory(test_dir,
+                                                                 shuffle=True,
+                                                                 batch_size=None,
+                                                                 label_mode='binary',
+                                                                 image_size=IMG_SIZE)
 
     class_names = train_datasets.class_names
 
@@ -153,14 +161,13 @@ if __name__ == '__main__':
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
               loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
               metrics=['accuracy'])
-    initial_epochs = 1
     history = model.fit(train_datasets,
                         epochs=initial_epochs,
                         validation_data=val_datasets)
 
     # Retrieve a batch of images from the test set
     test_image_batch, test_label_batch = next(iter(test_datasets))
-    predictions = model.predict(tf.data.Dataset.from_tensors(test_image_batch).batch(BATCH_SIZE), batch_size=BATCH_SIZE).flatten()
+    predictions = model.predict(test_image_batch).flatten()
 
     # Apply a sigmoid since our model returns logits
     predictions = tf.nn.sigmoid(predictions)
