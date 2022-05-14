@@ -1,12 +1,15 @@
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-import tensorflow as tf
-from tensorflow.python.ops.gen_dataset_ops import BatchDataset
-from tensorflow import keras
-from keras import layers
+from time import time
+import argparse
 
-datadir = '/home/tom/Desktop/images/water'
+import matplotlib.pyplot as plt
+import tensorflow as tf
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("datadir")
+args = parser.parse_args()
+
+datadir = args.datadir
 BATCH_SIZE = 8
 IMG_SIZE = (150, 200)
 k = 4
@@ -91,16 +94,21 @@ def convert_train_datasets(train_datasets):
 
 
 if __name__ == '__main__':
+    tf.random.set_seed(round(time()))
     train_datasets = tf.keras.utils.image_dataset_from_directory(datadir,
-                                                                shuffle=False,
+                                                                shuffle=True,
                                                                 batch_size=None,
+                                                                 label_mode='binary',
                                                                  validation_split=0.25,
+                                                                 seed=2,
                                                                  subset='training',
                                                                 image_size=IMG_SIZE)
     val_datasets = tf.keras.utils.image_dataset_from_directory(datadir,
                                                                  shuffle=False,
                                                                  batch_size=None,
+                                                                 label_mode='binary',
                                                                  validation_split=0.25,
+                                                               seed=2,
                                                                  subset='validation',
                                                                  image_size=IMG_SIZE)
     val_batches = tf.data.experimental.cardinality(val_datasets)
