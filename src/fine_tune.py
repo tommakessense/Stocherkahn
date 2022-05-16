@@ -31,40 +31,10 @@ def show_image_and_label(train_dataset):
 def get_data_augmentation():
     data_augmentation = tf.keras.Sequential([
         tf.keras.layers.RandomContrast(0.3),
-
+        # requires tf-nightly
         # tf.keras.layers.RandomBrightness(0.4),
     ])
     return data_augmentation
-
-
-def create_additional_datasets(data_augmentation, train_datasets, size=8):
-    augmented_images = []
-    augmented_labels = []
-    for image, label in train_datasets:
-        for i in range(size):
-            augmented_image = data_augmentation(image)
-            augmented_images.append(augmented_image)
-            augmented_labels.append(label)
-    augmented_images = tf.stack(augmented_images)
-    augmented_labels = tf.stack(augmented_labels)
-    dataset = tf.data.Dataset.from_tensor_slices(
-        (augmented_images, augmented_labels))
-    return dataset
-
-
-def build_model_kfold(base_model, shape, data_augmentation):
-    global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
-    prediction_layer = tf.keras.layers.Dense(1)
-    inputs = tf.keras.Input(shape=shape)
-    # x = data_augmentation(inputs)
-    x = tf.keras.applications.mobilenet_v3.preprocess_input(inputs)
-    x = base_model(x, training=False)
-    x = global_average_layer(x)
-    x = tf.keras.layers.Dropout(0.2)(x)
-    outputs = prediction_layer(x)
-    kmodel = tf.keras.Model(inputs, outputs)
-    kmodel.compile(optimizer="rmsprop", loss="mse", metrics=["accuracy"])
-    return kmodel
 
 
 def get_kfolded_datasets(train_data: list, train_targets: list,
@@ -89,15 +59,6 @@ def get_kfolded_datasets(train_data: list, train_targets: list,
            batch(val_targets, batch_size), \
            batch(partial_train_data, batch_size), \
            batch(partial_train_targets, batch_size)
-
-
-def convert_train_datasets(train_datasets):
-    train_data = []
-    train_targets = []
-    for image, label in train_datasets:
-        train_data.append(image)
-        train_targets.append(label)
-    return train_data, train_targets
 
 
 def create_datasets(image_size, train_dir, test_dir):
@@ -139,17 +100,11 @@ if __name__ == '__main__':
     )
     class_names = train_datasets.class_names
 
-    # add more training data
-    if args.augment:
-        data_augmentation = get_data_augmentation()
-        additional_datasets = create_additional_datasets(data_augmentation, train_datasets, 4)
-        train_datasets = train_datasets.concatenate(additional_datasets)
     AUTOTUNE = tf.data.AUTOTUNE
     train_datasets = train_datasets.prefetch(buffer_size=AUTOTUNE)
     val_datasets = val_datasets.prefetch(buffer_size=AUTOTUNE)
     train_datasets = train_datasets.batch(BATCH_SIZE)
     val_datasets = val_datasets.batch(BATCH_SIZE)
-    # train_data, train_targets = convert_train_datasets(train_datasets)
 
     preprocess_input = tf.keras.applications.mobilenet_v3.preprocess_input
     IMG_SHAPE = IMG_SIZE + (3,)
@@ -165,7 +120,12 @@ if __name__ == '__main__':
     prediction_layer = tf.keras.layers.Dense(1)
 
     inputs = tf.keras.Input(shape=IMG_SHAPE)
-    x = tf.keras.applications.mobilenet_v3.preprocess_input(inputs)
+    if args.augment:
+        data_augmentation = get_data_augmentation()
+        x = data_augmentation(inputs)
+    else:
+        x = inputs
+    x = preprocess_input(x)
     x = base_model(x, training=False)
     x = global_average_layer(x)
     x = tf.keras.layers.Dropout(0.2)(x)
