@@ -1,5 +1,6 @@
 from os import path, listdir, walk
 from pathlib import Path
+from typing import Set
 
 import cv2
 
@@ -12,8 +13,7 @@ def get_args(parser):
     parser.add_argument("--img-sec", type=int, default=1)
 
 
-def get_extracted(data_dir):
-    img_dir = path.join(data_dir, 'labeled')
+def get_extracted(img_dir) -> Set:
     _extracted = set({})
     for root, dirs, files in walk(img_dir):
         for file in files:
@@ -66,5 +66,6 @@ if __name__ == '__main__':
     datadir = args.datadir
     images_per_sec = args.img_sec
 
-    extracted = get_extracted(datadir)
-    process_video_dir(datadir, extracted)
+    extracted = get_extracted(path.join(datadir, 'labeled'))
+    extracted_tests = get_extracted(path.join(datadir, 'tests'))
+    process_video_dir(datadir, extracted.union(extracted_tests))
