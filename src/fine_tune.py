@@ -36,6 +36,19 @@ def get_data_augmentation():
     ])
     return data_augmentation
 
+def create_additional_datasets(data_augmentation, train_datasets, size=8):
+    augmented_images = []
+    augmented_labels = []
+    for image, label in train_datasets:
+        for i in range(size):
+            augmented_image = data_augmentation(image)
+            augmented_images.append(augmented_image)
+            augmented_labels.append(label)
+    augmented_images = tf.stack(augmented_images)
+    augmented_labels = tf.stack(augmented_labels)
+    dataset = tf.data.Dataset.from_tensor_slices((augmented_images, augmented_labels))
+    return dataset
+
 
 def get_kfolded_datasets(train_data: list, train_targets: list,
                          num_val_samples: int, i: int, batch_size: int = 8):
@@ -100,6 +113,10 @@ if __name__ == '__main__':
     )
     class_names = train_datasets.class_names
 
+    data_augmentation = get_data_augmentation()
+    additional_datasets = create_additional_datasets(data_augmentation, train_datasets, 8)
+    train_datasets = train_datasets.concatenate(additional_datasets)
+
     AUTOTUNE = tf.data.AUTOTUNE
     train_datasets = train_datasets.prefetch(buffer_size=AUTOTUNE)
     val_datasets = val_datasets.prefetch(buffer_size=AUTOTUNE)
@@ -120,11 +137,11 @@ if __name__ == '__main__':
     prediction_layer = tf.keras.layers.Dense(1)
 
     inputs = tf.keras.Input(shape=IMG_SHAPE)
-    if args.augment:
-        data_augmentation = get_data_augmentation()
-        x = data_augmentation(inputs)
-    else:
-        x = inputs
+    # if args.augment:
+    #     data_augmentation = get_data_augmentation()
+    #     x = data_augmentation(inputs)
+    # else:
+    x = inputs
     x = preprocess_input(x)
     x = base_model(x, training=False)
     x = global_average_layer(x)
@@ -159,7 +176,7 @@ if __name__ == '__main__':
     plt.figure(figsize=(10, 10))
     plt.subplots_adjust(hspace=0.5)
     for i in range(BATCH_SIZE):
-        plt.subplot(3, 3, i + 1)
+        plt.subplot(4, 4, i + 1)
         shaped_img = test_image_batch[i]
         plt.imshow(shaped_img.numpy().astype("uint8"))
         plt.title(class_names[predictions[i]])
