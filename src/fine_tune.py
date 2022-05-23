@@ -130,8 +130,11 @@ if __name__ == '__main__':
                                                         weights='imagenet')
     image_batch, label_batch = next(iter(train_datasets))
     feature_batch = base_model(image_batch)
-    base_model.trainable = False
-    # base_model.summary()
+    base_model.trainable = True
+    # print("Number of layers in the base model: ", len(base_model.layers))
+    fine_tune_at = 175
+    for layer in base_model.layers[:fine_tune_at]:
+        layer.trainable = False
 
     global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
     prediction_layer = tf.keras.layers.Dense(1)
@@ -150,10 +153,21 @@ if __name__ == '__main__':
     model = tf.keras.Model(inputs, outputs)
 
     base_learning_rate = 0.0001
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-        loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-        metrics=['accuracy'])
+    # model.compile(
+    #     optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+    #     loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+    #     metrics=['accuracy'])
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                  optimizer=tf.keras.optimizers.RMSprop(learning_rate=base_learning_rate/35),
+                  metrics=['accuracy'])
+    # model.summary()
+    # len(model.trainable_variables)
+    # history = model.fit(train_datasets,
+    #                     epochs=args.epochs,
+    #                     validation_data=val_datasets)
+    #     fine_tune_epochs = 10
+    # total_epochs =  initial_epochs + fine_tune_epochs
+
     history = model.fit(train_datasets,
                         epochs=args.epochs,
                         validation_data=val_datasets)
