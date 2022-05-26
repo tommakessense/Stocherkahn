@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 tensorflow = "*"
 matplotlib = "*"
-opencv-python = "*"
+opencv-python-headless = "*"
 pyqt5 = "*"
 
 [dev-packages]
